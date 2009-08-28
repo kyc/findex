@@ -2,6 +2,8 @@
 
 rake:db:indexes is a simple Rake task plugin that will help you locate missing database indexes. It can also generate migrations and run them, as well as filter by specific column types, names, and tables.
 
+**Please note** that this task is only designed to find any *potentially* overlooked indexes. It is not a good practice to index every matching column this thing returns. If you're curious what columns can (and should!) be optimized using indexes, try installing [my fork](http://github.com/flipsasser/bullet) of the [Bullet gem](http://github.com/flyerhzm/bullet) - it will notify you when your app performs a query that could be sped up with SQL indexes.
+
 ## Installation ##
 
 For now, install it as a Rails plugins:
