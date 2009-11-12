@@ -1,8 +1,12 @@
+require 'rubygems'
+require 'rake'
+require 'rake/tasklib'
+
 namespace :db do
   desc 'Finds indexes your application probably needs'
   task :indexes => [:environment, :prepare] do
-    indices = MissingIndices.get_indices(:geo, [:name, [:id, :type]], :primary, :reflection, [:type, [:boolean, :date, :datetime, :time]])
-    MissingIndices.send_indices(indices)
+    indices = Findex.get_indices(:geo, [:name, [:id, :type]], :primary, :reflection, [:type, [:boolean, :date, :datetime, :time]])
+    Findex.send_indices(indices)
   end
 
   task :prepare do
@@ -13,21 +17,21 @@ namespace :db do
 
   namespace :indexes do
     desc 'Finds unindexed boolean columns'
-    task :boolean => :environment do
+    task :boolean => [:environment, :prepare] do
       @migration_name = 'boolean'
-      MissingIndices.send_indices(MissingIndices.get_indices([:type, [:boolean]]))
+      Findex.send_indices(Findex.get_indices([:type, [:boolean]]))
     end
 
     desc 'Finds unindexed date, time, and datetime columns'
     task :datetime => [:environment, :prepare] do
       @migration_name = 'datetime'
-      MissingIndices.send_indices(MissingIndices.get_indices([:type, [:date, :datetime, :time]]))
+      Findex.send_indices(Findex.get_indices([:type, [:date, :datetime, :time]]))
     end
 
     desc 'Finds unindexed geo columns'
     task :geo => [:environment, :prepare] do
       @migration_name = 'geo'
-      MissingIndices.send_indices(MissingIndices.get_indices(:geo))
+      Findex.send_indices(Findex.get_indices(:geo))
     end
 
     desc 'Prints instructions on how to use rake:db:indexes'
@@ -56,15 +60,15 @@ namespace :db do
     task :migration => :environment do
       @generate_migration = true
       @perform_index = false
-      indices = MissingIndices.get_indices(:geo, [:name, [:id, :type]], :primary, :reflection, [:type, [:boolean, :date, :datetime, :time]])
-      MissingIndices.send_indices(indices)
+      indices = Findex.get_indices(:geo, [:name, [:id, :type]], :primary, :reflection, [:type, [:boolean, :date, :datetime, :time]])
+      Findex.send_indices(indices)
     end
 
     desc 'Finds unindexed columns matching the names you supply'
     task :names => [:environment, :prepare] do
       if ENV['names']
-        indices = MissingIndices.get_indices([:name, ENV['names'].split(',').map(&:strip).map(&:intern)])
-        MissingIndices.send_indices(indices)
+        indices = Findex.get_indices([:name, ENV['names'].split(',').map(&:strip).map(&:intern)])
+        Findex.send_indices(indices)
       else
         puts ''
         puts '  You must pass in a comma-separated collection of names like so'
@@ -77,27 +81,27 @@ namespace :db do
     task :perform => :environment do
       @generate_migration = false
       @perform_index = true
-      indices = MissingIndices.get_indices(:geo, [:name, [:id, :type]], :primary, :reflection, [:type, [:boolean, :date, :datetime, :time]])
-      MissingIndices.send_indices(indices)
+      indices = Findex.get_indices(:geo, [:name, [:id, :type]], :primary, :reflection, [:type, [:boolean, :date, :datetime, :time]])
+      Findex.send_indices(indices)
     end
 
     desc 'Finds unindexed primary keys'
     task :primary => [:environment, :prepare] do
       @migration_name = 'primary'
-      MissingIndices.send_indices(MissingIndices.get_indices(:primary))
+      Findex.send_indices(Findex.get_indices(:primary))
     end
 
     desc 'Finds unindexed relationship foreign keys'
     task :relationships => [:environment, :prepare] do
       @migration_name = 'relationship'
-      MissingIndices.send_indices(MissingIndices.get_indices(:reflection))
+      Findex.send_indices(Findex.get_indices(:reflection))
     end
 
     desc 'Finds unindexed columns matching the types you supply'
     task :types => [:environment, :prepare] do
       if ENV['types']
-        indices = MissingIndices.get_indices([:type, ENV['types'].split(',').map(&:strip).map(&:intern)])
-        MissingIndices.send_indices(indices)
+        indices = Findex.get_indices([:type, ENV['types'].split(',').map(&:strip).map(&:intern)])
+        Findex.send_indices(indices)
       else
         puts ''
         puts '  You must pass in a comma-separated collection of types like so'
@@ -109,7 +113,7 @@ namespace :db do
   end
 end
 
-module MissingIndices
+module Findex
   def self.check_index(*args)
     index = args.shift
     !args.any?{|array| array.any?{|comparison_index| comparison_index == index}}

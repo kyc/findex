@@ -1,16 +1,28 @@
-# rake:db:indexes #
+# Findex #
 
-rake:db:indexes is a simple Rake task plugin that will help you locate missing database indexes. It can also generate migrations and run them, as well as filter by specific column types, names, and tables.
+Findex is a simple collection of Rake tasks that will help you locate missing database indexes in your Rails app. It can also generate migrations and run them, as well as filter by specific column types, names, and tables.
 
-**Please note** that this task is only designed to find any *potentially* overlooked indexes. It is not a good practice to index every matching column this thing returns. If you're curious what columns can (and should!) be optimized using indexes, try installing [my fork](http://github.com/flipsasser/bullet) of the [Bullet gem](http://github.com/flyerhzm/bullet) - it will notify you when your app performs a query that could be sped up with SQL indexes.
+**Please note** that Findex designed to find any potentially overlooked indexes. It is not a good practice to index every matching column it returns - that's way too many.
 
 ## Installation ##
 
-For now, install it as a Rails plugins:
+Install Findex as a gem:
 
-	ruby script/plugin install git://github.com/flipsasser/rake-db-indexes.git
+	$ gem install findex --source=http://gems.github.com
 
-I will add a Gem sooner or later.
+You may want to configure it as a gem in environment.rb instead, since you're going to need it in your Rakefile:
+
+	config.gem 'findex', :source => 'http://gemcutter.org'
+
+... then run:
+
+	rake gems:install
+
+In either case. open your Rails app's Rakefile and add the following line:
+
+	require 'findex/tasks'
+
+And it's installed. Bam.
 
 ## Find Missing Indexes ##
 
