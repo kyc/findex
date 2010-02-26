@@ -5,33 +5,37 @@ require 'rake/tasklib'
 namespace :db do
   desc 'Finds indexes your application probably needs'
   task :indexes => [:environment, :prepare] do
-    indices = Findex.get_indices(:geo, [:name, [:id, :type]], :primary, :reflection, [:type, [:boolean, :date, :datetime, :time]])
-    Findex.send_indices(indices)
+    indices = @findex.get_indices(:geo, [:name, [:id, :type]], :primary, :reflection, [:type, [:boolean, :date, :datetime, :time]])
+    @findex.send_indices(indices)
   end
 
   task :prepare do
-    @generate_migration = ENV['migration'] == 'true'
-    @perform_index = ENV['perform'] == 'true'
-    @tables = ENV['tables'] ? ENV['tables'].split(',').map(&:strip) : nil
+    @findex = Findex.new
+    @findex.generate_migration = ENV['migration'] == 'true'
+    @findex.perform_index = ENV['perform'] == 'true'
+    @findex.tables = ENV['tables'] ? ENV['tables'].split(',').map(&:strip) : nil
+    Dir[File.join(Rails.root, 'app', 'models', '*.rb')].each do |file|
+      load(file)
+    end
   end
 
   namespace :indexes do
     desc 'Finds unindexed boolean columns'
     task :boolean => [:environment, :prepare] do
-      @migration_name = 'boolean'
-      Findex.send_indices(Findex.get_indices([:type, [:boolean]]))
+      @findex.migration_name = 'boolean'
+      @findex.send_indices(@findex.get_indices([:type, [:boolean]]))
     end
 
     desc 'Finds unindexed date, time, and datetime columns'
     task :datetime => [:environment, :prepare] do
-      @migration_name = 'datetime'
-      Findex.send_indices(Findex.get_indices([:type, [:date, :datetime, :time]]))
+      @findex.migration_name = 'datetime'
+      @findex.send_indices(@findex.get_indices([:type, [:date, :datetime, :time]]))
     end
 
     desc 'Finds unindexed geo columns'
     task :geo => [:environment, :prepare] do
-      @migration_name = 'geo'
-      Findex.send_indices(Findex.get_indices(:geo))
+      @findex.migration_name = 'geo'
+      @findex.send_indices(@findex.get_indices(:geo))
     end
 
     desc 'Prints instructions on how to use rake:db:indexes'
@@ -45,7 +49,7 @@ namespace :db do
       puts '    `rake db:indexes migration=true`'
       puts ''
       puts '  You can also target specific column types, like so:'
-      for type in [:boolean, :datetime, :geo, :primary, :relationships]
+      [:boolean, :datetime, :geo, :primary, :relationships].each do |type|
         puts "    `rake db:indexes:#{type}`"
       end
       puts ''
@@ -58,17 +62,17 @@ namespace :db do
 
     desc 'Generates a migration file with the recommended indexes'
     task :migration => :environment do
-      @generate_migration = true
-      @perform_index = false
-      indices = Findex.get_indices(:geo, [:name, [:id, :type]], :primary, :reflection, [:type, [:boolean, :date, :datetime, :time]])
-      Findex.send_indices(indices)
+      @findex.generate_migration = true
+      @findex.perform_index = false
+      indices = @findex.get_indices(:geo, [:name, [:id, :type]], :primary, :reflection, [:type, [:boolean, :date, :datetime, :time]])
+      @findex.send_indices(indices)
     end
 
     desc 'Finds unindexed columns matching the names you supply'
     task :names => [:environment, :prepare] do
       if ENV['names']
-        indices = Findex.get_indices([:name, ENV['names'].split(',').map(&:strip).map(&:intern)])
-        Findex.send_indices(indices)
+        indices = @findex.get_indices([:name, ENV['names'].split(',').map(&:strip).map(&:intern)])
+        @findex.send_indices(indices)
       else
         puts ''
         puts '  You must pass in a comma-separated collection of names like so'
@@ -79,29 +83,29 @@ namespace :db do
 
     desc 'Performs a migration with the recommended indexes'
     task :perform => :environment do
-      @generate_migration = false
-      @perform_index = true
-      indices = Findex.get_indices(:geo, [:name, [:id, :type]], :primary, :reflection, [:type, [:boolean, :date, :datetime, :time]])
-      Findex.send_indices(indices)
+      @findex.generate_migration = false
+      @findex.perform_index = true
+      indices = @findex.get_indices(:geo, [:name, [:id, :type]], :primary, :reflection, [:type, [:boolean, :date, :datetime, :time]])
+      @findex.send_indices(indices)
     end
 
     desc 'Finds unindexed primary keys'
     task :primary => [:environment, :prepare] do
-      @migration_name = 'primary'
-      Findex.send_indices(Findex.get_indices(:primary))
+      @findex.migration_name = 'primary'
+      @findex.send_indices(@findex.get_indices(:primary))
     end
 
     desc 'Finds unindexed relationship foreign keys'
     task :relationships => [:environment, :prepare] do
-      @migration_name = 'relationship'
-      Findex.send_indices(Findex.get_indices(:reflection))
+      @findex.migration_name = 'relationship'
+      @findex.send_indices(@findex.get_indices(:reflection))
     end
 
     desc 'Finds unindexed columns matching the types you supply'
     task :types => [:environment, :prepare] do
       if ENV['types']
-        indices = Findex.get_indices([:type, ENV['types'].split(',').map(&:strip).map(&:intern)])
-        Findex.send_indices(indices)
+        indices = @findex.get_indices([:type, ENV['types'].split(',').map(&:strip).map(&:intern)])
+        @findex.send_indices(indices)
       else
         puts ''
         puts '  You must pass in a comma-separated collection of types like so'
@@ -113,13 +117,13 @@ namespace :db do
   end
 end
 
-module Findex
-  def self.check_index(*args)
+class Findex
+  def check_index(*args)
     index = args.shift
     !args.any?{|array| array.any?{|comparison_index| comparison_index == index}}
   end
 
-  def self.collect_indices(indices)
+  def collect_indices(indices)
     indices.collect{|table, columns| [table, columns.sort{|a, b|
       if a == :id
         -1 
@@ -131,11 +135,11 @@ module Findex
     }]}.sort{|a, b| a[0].to_s <=> b[0].to_s}
   end
 
-  def self.connection
+  def connection
     @connection ||= ActiveRecord::Base.connection
   end
 
-  def self.get_indices(*args)
+  def get_indices(*args)
     indices = {}
     ObjectSpace.each_object(Class) do |model|
       next unless model.ancestors.include?(ActiveRecord::Base) && model != ActiveRecord::Base && model.table_exists?
@@ -148,7 +152,7 @@ module Findex
     collect_indices(indices)
   end
 
-  def self.get_model_geo_indices(model, indices, existing_indices)
+  def get_model_geo_indices(model, indices, existing_indices)
     indices[model.table_name] ||= []
     parse_columns(model) do |column, column_name|
       if column.type == :decimal && column.name =~ /(lat|lng)/ && model.column_names.include?(alternate_column_name = column.name.gsub(/(^|_)(lat|lng)($|_)/) { "#{$1}#{$2 == 'lat' ? 'lng' : 'lat'}#{$3}"})
@@ -159,7 +163,7 @@ module Findex
     indices
   end
 
-  def self.get_model_name_indices(model, names, indices, existing_indices)
+  def get_model_name_indices(model, names, indices, existing_indices)
     indices[model.table_name] ||= []
     parse_columns(model) do |column, column_name|
       if names.include?(column_name) && check_index(column_name, indices[model.table_name], existing_indices)
@@ -169,7 +173,7 @@ module Findex
     indices  
   end
 
-  def self.get_model_primary_indices(model, indices, existing_indices)
+  def get_model_primary_indices(model, indices, existing_indices)
     indices[model.table_name] ||= []
     parse_columns(model) do |column, column_name|
       if column.primary && check_index(column_name, indices[model.table_name], existing_indices)
@@ -179,9 +183,9 @@ module Findex
     indices
   end
 
-  def self.get_model_reflection_indices(model, indices, existing_indices)
+  def get_model_reflection_indices(model, indices, existing_indices)
     indices[model.table_name] ||= []
-    for name, reflection in model.reflections
+    model.reflections.each do |name, reflection|
       case reflection.macro.to_sym
       when :belongs_to
         foreign_key = reflection.primary_key_name.to_sym
@@ -199,7 +203,7 @@ module Findex
     indices
   end
 
-  def self.get_model_type_indices(model, types, indices, existing_indices)
+  def get_model_type_indices(model, types, indices, existing_indices)
     indices[model.table_name] ||= []
     parse_columns(model) do |column, column_name|
       if types.include?(column.type) && check_index(column_name, indices[model.table_name], existing_indices)
@@ -209,17 +213,17 @@ module Findex
     indices
   end
 
-  def self.parse_columns(model)
+  def parse_columns(model)
     model.columns.each{|column| yield(column, column.name.to_sym)} if block_given?
   end
 
-  def self.send_indices(indices)
+  def send_indices(indices)
     if @generate_migration
       require 'rails_generator'
       migration_path = File.join(RAILS_ROOT, 'db', 'migrate')
       migration_number = 1
       migration_test = "add#{"_#{@migration_name}" if @migration_name}_indexes"
-      for file in Dir[File.join(migration_path, '*.rb')]
+      Dir[File.join(migration_path, '*.rb')].each do |file|
         file = File.basename(file)
         next unless file =~ /^\d+_#{migration_test}(\d+)\.rb$/
         migration_number += 1
@@ -229,25 +233,29 @@ module Findex
       if migration = Dir[File.join(migration_path, "*#{migration_name}.rb")].first
         migration_up = []
         migration_down = []
-        for table, columns in indices.sort{|a, b| a[0].to_s <=> b[0].to_s}
+        indices.sort{|a, b| a[0].to_s <=> b[0].to_s}.each do |table, columns|
           next if columns.empty?
-          migration_up << "\s\s\s\s# Indices for `#{table}`"
-          migration_down << "\s\s\s\s# Remove indices for `#{table}`"
-          for column in columns
-            migration_up << "\s\s\s\sadd_index :#{table}, #{column.inspect}"
-            migration_down << "\s\s\s\sremove_index :#{table}, #{column.inspect}"
+          index_up = []
+          index_down = []
+          index_up.push("\s\s\s\s# Indices for `#{table}`")
+          index_down.push("\s\s\s\s# Remove indices for `#{table}`")
+          columns.each do |column|
+            index_up.push("\s\s\s\sadd_index :#{table}, #{column.inspect}")
+            index_down.push("\s\s\s\sremove_index :#{table}, #{column.inspect}")
           end
+          migration_up.push(index_up.join("\n"))
+          migration_down.push(index_down.join("\n"))
         end
-        migration_contents = File.read(migration).gsub("def self.up", "def self.up\n#{migration_up.join("\n")}").gsub("def self.down", "def self.down\n#{migration_down.join("\n")}")
+        migration_contents = File.read(migration).gsub("def self.up", "def self.up\n#{migration_up.join("\n\n")}").gsub("def self.down", "def self.down\n#{migration_down.join("\n\n")}")
         File.open(migration, 'w+') do |file|
           file.puts migration_contents
-        end
+         end
       end
     else
-      for table, columns in indices.sort{|a, b| a[0].to_s <=> b[0].to_s}
+      indices.sort{|a, b| a[0].to_s <=> b[0].to_s}.each do |table, columns|
         next if columns.empty?
         puts "\s\s# Indices for `#{table}`"
-        for column in columns
+        columns.each do |column|
           if @perform_index
             ActiveRecord::Migration.add_index(table, column)
           else
@@ -257,5 +265,21 @@ module Findex
         puts ''
       end
     end
+  end
+
+  def generate_migration=(value)
+    @generate_migration = !!value
+  end
+
+  def perform_index=(value)
+    @perform_index = !!value
+  end
+
+  def tables=(tables)
+    @tables = tables
+  end
+
+  def migration_name=(value)
+    @migration_name = value
   end
 end

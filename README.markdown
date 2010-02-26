@@ -18,11 +18,12 @@ You may want to configure it as a gem in environment.rb instead, since you're go
 
 	rake gems:install
 
-In either case. open your Rails app's Rakefile and add the following line:
+Now add it to your projects' Rakefile:
 
-	require 'findex/tasks'
-
-And it's installed. Bam.
+	begin
+	  require 'findex/tasks'
+	rescue MissingSourceFile
+	end
 
 ## Find Missing Indexes ##
 
@@ -52,4 +53,4 @@ First, get some instructions:
 
 Read the instructions above and start finding missing indexes! Thanks to Matt Janowski for the inspiration (http://robots.thoughtbot.com/post/163627511/a-grand-piano-for-your-violin) and Thoughtbot / Jon Yurek for the core of the indexes detection code!
 
-Copyright (c) 2009 Flip Sasser, released under the MIT license.
+Copyright (c) 2010 Flip Sasser, released under the MIT license.
