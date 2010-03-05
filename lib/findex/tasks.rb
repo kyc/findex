@@ -5,7 +5,7 @@ require 'rake/tasklib'
 namespace :db do
   desc 'Finds indexes your application probably needs'
   task :indexes => [:environment, :prepare] do
-    indices = @findex.get_indices(:geo, [:name, [:id, :type]], :primary, :reflection, [:type, [:boolean, :date, :datetime, :time]])
+    indices = @findex.get_indices(:geo, [:name, [:id, :type]], :reflection, [:type, [:boolean, :date, :datetime, :time]])
     @findex.send_indices(indices)
   end
 
@@ -49,7 +49,7 @@ namespace :db do
       puts '    `rake db:indexes migration=true`'
       puts ''
       puts '  You can also target specific column types, like so:'
-      [:boolean, :datetime, :geo, :primary, :relationships].each do |type|
+      [:boolean, :datetime, :geo, :relationships].each do |type|
         puts "    `rake db:indexes:#{type}`"
       end
       puts ''
@@ -64,7 +64,7 @@ namespace :db do
     task :migration => :environment do
       @findex.generate_migration = true
       @findex.perform_index = false
-      indices = @findex.get_indices(:geo, [:name, [:id, :type]], :primary, :reflection, [:type, [:boolean, :date, :datetime, :time]])
+      indices = @findex.get_indices(:geo, [:name, [:id, :type]], :reflection, [:type, [:boolean, :date, :datetime, :time]])
       @findex.send_indices(indices)
     end
 
@@ -85,14 +85,8 @@ namespace :db do
     task :perform => :environment do
       @findex.generate_migration = false
       @findex.perform_index = true
-      indices = @findex.get_indices(:geo, [:name, [:id, :type]], :primary, :reflection, [:type, [:boolean, :date, :datetime, :time]])
+      indices = @findex.get_indices(:geo, [:name, [:id, :type]], :reflection, [:type, [:boolean, :date, :datetime, :time]])
       @findex.send_indices(indices)
-    end
-
-    desc 'Finds unindexed primary keys'
-    task :primary => [:environment, :prepare] do
-      @findex.migration_name = 'primary'
-      @findex.send_indices(@findex.get_indices(:primary))
     end
 
     desc 'Finds unindexed relationship foreign keys'
@@ -173,16 +167,6 @@ class Findex
     indices  
   end
 
-  def get_model_primary_indices(model, indices, existing_indices)
-    indices[model.table_name] ||= []
-    parse_columns(model) do |column, column_name|
-      if column.primary && check_index(column_name, indices[model.table_name], existing_indices)
-        indices[model.table_name].push(column_name)
-      end
-    end
-    indices
-  end
-
   def get_model_reflection_indices(model, indices, existing_indices)
     indices[model.table_name] ||= []
     model.reflections.each do |name, reflection|
@@ -214,7 +198,7 @@ class Findex
   end
 
   def parse_columns(model)
-    model.columns.each{|column| yield(column, column.name.to_sym)} if block_given?
+    model.columns.reject(&:primary).each{|column| yield(column, column.name.to_sym)} if block_given?
   end
 
   def send_indices(indices)
