@@ -61,7 +61,7 @@ namespace :db do
     end
 
     desc 'Generates a migration file with the recommended indexes'
-    task :migration => :environment do
+    task :migration => [:environment, :prepare] do
       @findex.generate_migration = true
       @findex.perform_index = false
       indices = @findex.get_indices(:geo, [:name, [:id, :type]], :reflection, [:type, [:boolean, :date, :datetime, :time]])
@@ -82,7 +82,7 @@ namespace :db do
     end
 
     desc 'Performs a migration with the recommended indexes'
-    task :perform => :environment do
+    task :perform => [:environment, :prepare] do
       @findex.generate_migration = false
       @findex.perform_index = true
       indices = @findex.get_indices(:geo, [:name, [:id, :type]], :reflection, [:type, [:boolean, :date, :datetime, :time]])
@@ -138,9 +138,15 @@ class Findex
     ObjectSpace.each_object(Class) do |model|
       next unless model.ancestors.include?(ActiveRecord::Base) && model != ActiveRecord::Base && model.table_exists?
       next if @tables && !@tables.include?(model.table_name.to_s)
-      existing_indices = connection.indexes(model.table_name).map{|index| index.columns.length == 1 ? index.columns.first.to_sym : index.columns.map(&:to_sym) }
-      args.each do |method, options|
-        indices = send("get_model_#{method}_indices", *[model, options, indices, existing_indices].compact)
+      begin
+        # Check for views... expected to fail.
+        Applicant.connection.execute("SHOW CREATE VIEW #{model.table_name}")
+      rescue ActiveRecord::StatementInvalid
+        existing_indices = connection.indexes(model.table_name).map{|index| index.columns.length == 1 ? index.columns.first.to_sym : index.columns.map(&:to_sym) }
+        args.each do |method, options|
+          indices = send("get_model_#{method}_indices", *[model, options, indices, existing_indices].compact)
+        end
+        
       end
     end
     collect_indices(indices)
@@ -224,7 +230,13 @@ class Findex
           index_up.push("\s\s\s\s# Indices for `#{table}`")
           index_down.push("\s\s\s\s# Remove indices for `#{table}`")
           columns.each do |column|
-            index_up.push("\s\s\s\sadd_index :#{table}, #{column.inspect}")
+            if column.is_a?(Array)
+              index_up.push("\s\s\s\sadd_index :#{table}, #{column.inspect}, :name => :#{table}_#{column.join('_')}")
+            elsif "index_#{table}_on_#{column}".length > 64
+              index_up.push("\s\s\s\sadd_index :#{table}, #{column.inspect}, :name => :#{"#{table.to_s.singularize}_#{column.to_s.singularize}"[0, 64]}")
+            else
+              index_up.push("\s\s\s\sadd_index :#{table}, #{column.inspect}")
+            end
             index_down.push("\s\s\s\sremove_index :#{table}, #{column.inspect}")
           end
           migration_up.push(index_up.join("\n"))
