@@ -140,7 +140,7 @@ class Findex
       next if @tables && !@tables.include?(model.table_name.to_s)
       begin
         # Check for views... expected to fail.
-        Applicant.connection.execute("SHOW CREATE VIEW #{model.table_name}")
+        ActiveRecord::Base.connection.execute("SHOW CREATE VIEW #{model.table_name}")
       rescue ActiveRecord::StatementInvalid
         existing_indices = connection.indexes(model.table_name).map{|index| index.columns.length == 1 ? index.columns.first.to_sym : index.columns.map(&:to_sym) }
         args.each do |method, options|
