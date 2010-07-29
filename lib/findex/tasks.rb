@@ -179,7 +179,7 @@ class Findex
       case reflection.macro.to_sym
       when :belongs_to
         foreign_key = reflection.primary_key_name.to_sym
-        indices[model.table_name].push(foreign_key) if check_index(foreign_key, indices[model.table_name], existing_indices)
+        indices[model.table_name].push(foreign_key) if check_index(foreign_key, indices[model.table_name], existing_indices) && connection.table_exists?(table_name)
       when :has_and_belongs_to_many
         index = [reflection.primary_key_name.to_sym, reflection.association_foreign_key.to_sym]
         if (table_name = reflection.options[:join_table] || reflection.options['join_table']) && connection.table_exists?(table_name)
