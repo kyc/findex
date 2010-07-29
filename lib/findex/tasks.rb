@@ -14,7 +14,7 @@ namespace :db do
     @findex.generate_migration = ENV['migration'] == 'true'
     @findex.perform_index = ENV['perform'] == 'true'
     @findex.tables = ENV['tables'] ? ENV['tables'].split(',').map(&:strip) : nil
-    Dir[File.join(Rails.root, 'app', 'models', '*.rb')].each do |file|
+    Dir[File.join(Rails.root, 'app', 'models', '**','*.rb')].each do |file|
       load(file)
     end
   end
